@@ -12,6 +12,10 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = 'https://zahuloavitkzbeykpvig.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_x7GP6lnHX7uA39dXoHObQA_JJdcbNTk';
 
+// 구글 OAuth 클라이언트 ID (…apps.googleusercontent.com). 공개되어도 괜찮은 값입니다.
+// 비워 두면 예전 방식(구글 화면에 supabase.co 주소가 보이는 방식)으로 로그인합니다.
+const GOOGLE_CLIENT_ID = '200667894839-bgbi3768a0a4lhrrkou5n34a6f17bq6b.apps.googleusercontent.com';
+
 // 월드세팅 목록 (데이터베이스 규칙과 똑같아야 합니다)
 const WORLD_SETTINGS = [
   '범용',
@@ -166,19 +170,90 @@ function confirmModal(title, message, okLabel = '확인', danger = false) {
 }
 
 function loginPrompt(reason) {
-  openModal((close) => [
-    h('h2', null, '로그인이 필요해요'),
-    h('p', null, reason || '구글 계정으로 로그인하면 투고하고 좋아요를 누를 수 있어요.'),
-    h('div', { class: 'login-note' }, fromTemplate('text-login-note')),
-    h('div', { class: 'form-actions' },
-      h('button', { class: 'btn ghost', type: 'button', onclick: close }, '닫기'),
-      h('button', { class: 'btn primary', type: 'button', onclick: signIn }, '구글로 로그인'),
-    ),
-  ]);
+  openModal((close) => {
+    const head = [
+      h('h2', null, '구글 계정으로 로그인'),
+      h('p', null, reason || '로그인하면 투고하고 좋아요를 누를 수 있어요.'),
+    ];
+    const note = h('div', { class: 'login-note' }, fromTemplate('text-login-note'));
+    const closeRow = h('div', { class: 'form-actions' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '닫기'));
+
+    if (!GOOGLE_CLIENT_ID) {
+      return [...head, h('p', null, h('button', { class: 'btn primary', type: 'button', onclick: signInRedirect }, '구글로 로그인')),
+        note, h('p', { class: 'login-note' }, '구글 로그인 화면에 표시되는 ○○.supabase.co는 이 사이트의 데이터 서버 주소예요.'), closeRow];
+    }
+
+    const box = h('div', { class: 'gsi-box' }, h('span', { class: 'muted' }, '구글 로그인 버튼을 불러오는 중…'));
+    const fallback = h('details', { class: 'login-fallback' },
+      h('summary', null, '구글 버튼이 안 보이거나 로그인이 안 되나요?'),
+      h('p', null, '아래 버튼으로도 로그인할 수 있어요. 이 방식은 구글 화면에 이 사이트의 데이터 서버 주소(○○.supabase.co)가 표시돼요.'),
+      h('button', { class: 'btn small', type: 'button', onclick: signInRedirect }, '다른 방식으로 로그인'),
+    );
+    mountGoogleButton(box, close).then((ok) => {
+      if (!ok) {
+        box.replaceChildren(h('span', { class: 'muted' }, '구글 버튼을 불러오지 못했어요. 아래 "다른 방식으로 로그인"을 이용해 주세요.'));
+        fallback.open = true;
+      }
+    });
+    return [...head, box, note, fallback, closeRow];
+  });
 }
 
 // ---------- 로그인 ----------
-async function signIn() {
+let gsiLoading = null;
+function loadGoogleScript() {
+  if (window.google?.accounts?.id) return Promise.resolve(true);
+  if (!gsiLoading) {
+    gsiLoading = new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.onload = () => resolve(!!window.google?.accounts?.id);
+      script.onerror = () => { gsiLoading = null; resolve(false); };
+      document.head.append(script);
+      setTimeout(() => resolve(!!window.google?.accounts?.id), 10000);
+    });
+  }
+  return gsiLoading;
+}
+
+async function makeNonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const raw = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  const hashed = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  return { raw, hashed };
+}
+
+/** 구글 공식 로그인 버튼 표시. 이 방식은 구글 화면에 이 사이트 주소가 표시됩니다. */
+async function mountGoogleButton(box, close) {
+  try {
+    if (!(await loadGoogleScript())) return false;
+    const { raw, hashed } = await makeNonce();
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      nonce: hashed,
+      ux_mode: 'popup',
+      callback: async (response) => {
+        const { error } = await sb.auth.signInWithIdToken({ provider: 'google', token: response.credential, nonce: raw });
+        if (error) { toast(friendlyError(error), true); return; }
+        close();
+        toast('로그인했어요.');
+      },
+    });
+    box.replaceChildren();
+    window.google.accounts.id.renderButton(box, {
+      type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', locale: 'ko', width: 260,
+    });
+    return true;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+}
+
+/** 예전 방식: Supabase를 거쳐 구글로 이동했다가 돌아오는 로그인 */
+async function signInRedirect() {
   safeSession('set', 'returnHash', location.hash || '#/');
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
@@ -222,7 +297,7 @@ function renderAccount() {
   const box = document.getElementById('account');
   box.replaceChildren();
   if (!state.user) {
-    box.append(h('button', { class: 'btn primary small', type: 'button', onclick: signIn }, '구글로 로그인'));
+    box.append(h('button', { class: 'btn primary small', type: 'button', onclick: () => loginPrompt() }, '구글로 로그인'));
   } else {
     const name = state.profile?.nickname;
     box.append(
@@ -536,7 +611,7 @@ async function viewSubmit(alive, editId) {
   if (!state.user) {
     show(intro, h('div', { class: 'notice' },
       h('p', null, '투고하려면 구글 계정으로 로그인해 주세요.'),
-      h('p', null, h('button', { class: 'btn primary', type: 'button', onclick: signIn }, '구글로 로그인')),
+      h('p', null, h('button', { class: 'btn primary', type: 'button', onclick: () => loginPrompt() }, '구글로 로그인')),
       h('div', { class: 'login-note' }, fromTemplate('text-login-note')),
     ));
     return;
