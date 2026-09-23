@@ -282,6 +282,45 @@ function nicknameModal(isFirst) {
   });
 }
 
+function withdrawModal() {
+  openModal((close) => {
+    const deleteCards = h('input', { type: 'checkbox', id: 'wd-cards' });
+    const errorEl = h('p', { style: 'color:#ff9aa8;margin:8px 0 0', hidden: true });
+    const confirmBtn = h('button', { class: 'btn danger', type: 'button' }, '탈퇴하기');
+    confirmBtn.addEventListener('click', async () => {
+      confirmBtn.disabled = true;
+      const { error } = await sb.rpc('delete_my_account', { p_delete_cards: deleteCards.checked });
+      if (error) {
+        confirmBtn.disabled = false;
+        errorEl.textContent = friendlyError(error);
+        errorEl.hidden = false;
+        return;
+      }
+      await sb.auth.signOut({ scope: 'local' });
+      close();
+      await setUser(null);
+      toast('탈퇴했어요. 그동안 고마웠어요.');
+      if (parseHash().name === 'home') route(); else location.hash = '#/';
+    });
+    return [
+      h('h2', null, '정말 탈퇴할까요?'),
+      h('p', null, '로그인 정보, 닉네임, 좋아요 기록이 바로 삭제되고 되돌릴 수 없어요. 누른 좋아요도 카드에서 빠져요.'),
+      state.profile?.is_admin
+        ? h('p', { style: 'color:#ffb3bd' }, '⚠️ 관리자 계정이에요. 탈퇴하면 관리 권한도 사라져요.')
+        : null,
+      h('label', { for: 'wd-cards', style: 'display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer' },
+        deleteCards,
+        h('span', null, '내가 투고한 카드도 모두 삭제할게요. ',
+          h('span', { class: 'muted' }, '(체크하지 않으면 카드는 "(탈퇴한 사용자)" 이름으로 남아요)'))),
+      errorEl,
+      h('div', { class: 'form-actions' },
+        h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'),
+        confirmBtn,
+      ),
+    ];
+  });
+}
+
 // ---------- 광기 카드 템플릿 ----------
 function renderCard(card, opts = {}) {
   const { rank, preview = false, showLike = true, extraMeta } = opts;
@@ -658,7 +697,7 @@ async function viewMy(alive) {
     h('div', { class: 'profile-box' },
       h('span', null, '닉네임: ', h('b', null, state.profile?.nickname || '(아직 없음)')),
       h('button', { class: 'btn small', type: 'button', onclick: () => nicknameModal(!state.profile) }, state.profile ? '변경' : '정하기'),
-      h('span', { class: 'muted', style: 'margin-left:auto;font-size:13px' }, '탈퇴는 ', h('a', { href: '#/privacy' }, '개인정보처리방침'), '의 연락처로 요청해 주세요.'),
+      h('button', { class: 'btn small danger', type: 'button', style: 'margin-left:auto', onclick: withdrawModal }, '탈퇴하기'),
     ),
     list,
   );
