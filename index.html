@@ -3,70 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>인세인 광기 카드 공모 — 준비 중</title>
-  <style>
-    :root {
-      --bg: #0f0d0e;
-      --paper: #1a1618;
-      --ink: #e8e1dc;
-      --muted: #9a8f8a;
-      --accent: #b3263a;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; }
-    body {
-      background: var(--bg);
-      color: var(--ink);
-      font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
-    .card {
-      width: 100%;
-      max-width: 420px;
-      background: var(--paper);
-      border: 1px solid #3a2f33;
-      border-top: 4px solid var(--accent);
-      border-radius: 10px;
-      padding: 40px 28px;
-      text-align: center;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-    }
-    .eyebrow {
-      font-size: 13px;
-      letter-spacing: 0.2em;
-      color: var(--accent);
-      margin: 0 0 12px;
-    }
-    h1 {
-      font-size: 24px;
-      margin: 0 0 16px;
-      line-height: 1.4;
-    }
-    p {
-      color: var(--muted);
-      line-height: 1.7;
-      margin: 0;
-    }
-    footer {
-      margin-top: 32px;
-      font-size: 11px;
-      color: #6d6360;
-      line-height: 1.6;
-    }
-  </style>
+  <!-- ▼ 브라우저 탭에 보이는 사이트 이름 -->
+  <title>인세인 광기 카드 공모</title>
+  <meta name="description" content="TRPG 인세인의 광기 카드 아이디어를 투고하고, 좋아요를 누르고, 인기 랭킹을 보는 팬 사이트">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="card">
-    <p class="eyebrow">COMING SOON</p>
-    <h1>인세인 광기 카드 공모</h1>
-    <p>광기가 스며드는 중입니다.<br>조금만 기다려 주세요.</p>
-    <footer>
-      본 사이트는 「河嶋陶一朗」「冒険企画局」「株式会社新紀元社」가 권리를 가진<br>
-      『マルチジャンル・ホラーRPG インセイン』의 2차 창작 팬 사이트입니다.
-    </footer>
-  </main>
+  <header class="site-header">
+    <div class="header-inner">
+      <!-- ▼ 화면 왼쪽 위 사이트 이름 -->
+      <a class="brand" href="#/">인세인 <span>광기 카드 공모</span></a>
+      <nav class="nav" id="nav">
+        <a href="#/" data-route="home">카드 보기</a>
+        <a href="#/submit" data-route="submit">투고하기</a>
+        <a href="#/my" data-route="my" class="needs-login">내 카드</a>
+        <a href="#/admin" data-route="admin" class="needs-admin">관리</a>
+      </nav>
+      <div class="account" id="account"></div>
+    </div>
+  </header>
+
+  <main id="app" class="container" aria-live="polite"></main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p class="footer-links">
+        <a href="#/rules">투고 규칙</a>
+        <span aria-hidden="true">·</span>
+        <a href="#/privacy">개인정보처리방침</a>
+      </p>
+      <!-- ▼ 권리 표기 -->
+      <p class="rights">
+        본 사이트는 「河嶋陶一朗」「冒険企画局」「株式会社新紀元社」가 권리를 가진
+        『マルチジャンル・ホラーRPG インセイン』<br>
+        (한국어판 『인세인』 TRPG Club 발행 / 영문명 inSANe)의 비공식 2차 창작 팬 사이트입니다.<br>
+        투고된 카드의 저작권은 각 투고자에게 있습니다.
+      </p>
+    </div>
+  </footer>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <div id="modal-root"></div>
+
+  <!-- =====================================================================
+       ▼ 아래는 페이지별 문구입니다. 글자만 바꾸면 사이트에 반영됩니다.
+         꺾쇠 괄호(<p>, </li> 등)는 건드리지 말고 사이에 있는 글자만 고치세요.
+       ===================================================================== -->
+
+  <!-- 첫 화면 소개 문구 -->
+  <template id="text-home-intro">
+    <h1>당신이 떠올린 광기를 들려주세요</h1>
+    <p>인세인의 광기 카드 아이디어를 모집합니다. 마음에 드는 카드에는 좋아요를 눌러 주세요.</p>
+  </template>
+
+  <!-- 투고 화면 안내 문구 -->
+  <template id="text-submit-intro">
+    <h1>광기 카드 투고</h1>
+    <p>투고한 카드는 관리자 확인 후 게시됩니다. 게시 전까지는 <a href="#/my">내 카드</a>에서 수정할 수 있어요.
+      투고 전에 <a href="#/rules">투고 규칙</a>을 꼭 읽어 주세요.</p>
+  </template>
+
+  <!-- 로그인 버튼 옆 안내 문구 -->
+  <template id="text-login-note">
+    <p>구글 로그인 화면에 표시되는 <b>zahuloavitkzbeykpvig.supabase.co</b>는 이 사이트의 데이터 서버 주소입니다.
+      이메일과 실명은 사이트에 표시되지 않으며, 닉네임만 공개됩니다.</p>
+  </template>
+
+  <!-- 투고 규칙 -->
+  <template id="page-rules">
+    <article class="prose">
+      <h1>투고 규칙</h1>
+
+      <h2>투고할 수 있는 것</h2>
+      <ul>
+        <li>본인이 직접 떠올린 <b>창작 광기 카드</b>만 투고할 수 있습니다.</li>
+        <li>공식 룰북·서플리먼트에 실린 광기 카드의 문장을 그대로 옮기거나 조금만 바꾼 카드는 투고할 수 없습니다.</li>
+        <li>다른 사람의 창작물을 허락 없이 가져오거나 본인 것처럼 투고하지 마세요.</li>
+      </ul>
+
+      <h2>투고할 수 없는 것</h2>
+      <ul>
+        <li>실존 인물·단체를 비방하거나 특정할 수 있는 내용</li>
+        <li>혐오·차별 표현, 과도한 성적 묘사, 미성년자를 성적으로 다루는 내용</li>
+        <li>광고, 도배, 같은 카드의 반복 투고</li>
+      </ul>
+
+      <h2>운영 방식</h2>
+      <ul>
+        <li>투고한 카드는 관리자 확인 후 게시됩니다. 규칙에 맞지 않으면 반려될 수 있습니다.</li>
+        <li>게시 전(확인 대기 중)에는 수정할 수 있고, 삭제는 언제든 할 수 있습니다.</li>
+        <li>도배 방지를 위해 24시간 동안 1인당 5장까지 투고할 수 있습니다.</li>
+        <li>좋아요는 카드 한 장에 1인당 1번 누를 수 있고, 언제든 취소할 수 있습니다.</li>
+      </ul>
+
+      <h2>저작권</h2>
+      <ul>
+        <li>투고된 카드의 저작권은 투고자에게 있습니다.</li>
+        <li>투고자는 이 사이트에 카드를 게시하고, 랭킹 등으로 소개하는 것을 허락한 것으로 봅니다.</li>
+        <li>카드를 삭제하면 사이트에서도 사라집니다.</li>
+      </ul>
+
+      <h2>'인세인 SCP' 월드세팅 카드</h2>
+      <p>『인세인 3: 인세인 SCP』는 SCP 재단 설정을 바탕으로 하며, SCP 재단의 콘텐츠는
+        <a href="https://creativecommons.org/licenses/by-sa/3.0/deed.ko" target="_blank" rel="noopener">CC BY-SA 3.0</a>
+        라이선스를 따릅니다. 특정 SCP 항목의 내용을 소재로 쓴 카드는 해당 라이선스 조건(출처 표시, 동일 조건 변경 허락)을 따르는 것으로 봅니다.</p>
+
+      <h2>원작 권리 표기</h2>
+      <p>본 사이트는 「河嶋陶一朗」「冒険企画局」「株式会社新紀元社」가 권리를 가진
+        『マルチジャンル・ホラーRPG インセイン』(한국어판 『인세인』 TRPG Club 발행 / 영문명 inSANe)의
+        비공식 2차 창작 팬 사이트이며, 원작 권리자와 관계가 없습니다.</p>
+    </article>
+  </template>
+
+  <!-- 개인정보처리방침 -->
+  <template id="page-privacy">
+    <article class="prose">
+      <h1>개인정보처리방침</h1>
+
+      <h2>1. 수집하는 정보</h2>
+      <ul>
+        <li><b>구글 로그인 시 자동으로 저장되는 정보:</b> 구글 계정 이메일, 구글 계정 이름, 프로필 사진 주소, 로그인 식별자</li>
+        <li><b>직접 입력하는 정보:</b> 닉네임, 투고한 카드 내용</li>
+        <li><b>이용 기록:</b> 투고·좋아요한 시각</li>
+      </ul>
+
+      <h2>2. 이용 목적</h2>
+      <ul>
+        <li>본인 확인 및 로그인 유지</li>
+        <li>좋아요 중복 방지, 투고 도배 방지</li>
+        <li>투고 카드의 작성자 표시(닉네임만 표시)</li>
+      </ul>
+      <p>이메일, 구글 계정 이름, 프로필 사진은 사이트 화면에 표시되지 않으며, 위 목적 외에는 사용하지 않습니다.</p>
+
+      <h2>3. 보관 기간과 삭제</h2>
+      <p>탈퇴(계정 삭제)를 요청하시면 로그인 정보, 닉네임, 좋아요 기록을 삭제합니다.
+        투고한 카드는 작성자 표시 없이 남으며, 카드 삭제를 원하시면 탈퇴 전에 <a href="#/my">내 카드</a>에서 직접 삭제해 주세요.</p>
+
+      <h2>4. 정보를 처리하는 외부 서비스</h2>
+      <ul>
+        <li><b>Supabase</b>: 데이터 저장 및 로그인 처리 (서버 위치: 서울 리전)</li>
+        <li><b>Google</b>: 구글 계정 로그인</li>
+        <li><b>GitHub Pages</b>: 사이트 호스팅 (접속 기록이 남을 수 있음)</li>
+      </ul>
+
+      <h2>5. 문의 및 탈퇴 요청</h2>
+      <!-- ▼ 아래 이메일을 사이트 전용 이메일로 바꿔 주세요 -->
+      <p>이메일: <b>여기에-전용-이메일@gmail.com</b></p>
+
+      <p class="muted">시행일: 2026년 9월 23일</p>
+    </article>
+  </template>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>
